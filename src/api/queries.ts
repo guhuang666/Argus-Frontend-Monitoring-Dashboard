@@ -1,6 +1,13 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { request } from './client'
-import type { ErrorEventRow, PageResult, PerformanceRow } from './types'
+import type {
+  ErrorEventRow,
+  IssueDetail,
+  IssueRow,
+  IssueStatus,
+  PageResult,
+  PerformanceRow,
+} from './types'
 
 /**
  * 表格分页尺寸的合法取值。
@@ -37,5 +44,51 @@ export function usePerformanceMetrics(page: number, pageSize: number) {
     queryKey: ['performance-metrics', page, pageSize],
     queryFn: () => request<PageResult<PerformanceRow>>('/v1/performance', { page, pageSize }),
     placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * 问题列表分页查询（GET /api/v1/issues）。
+ *
+ * status 不传 = 不过滤（后端 ListIssuesQueryDto 的立场：默认不筛，
+ * 避免"归并越成功、看板越空"）。
+ *
+ * ⚠ queryKey 里用 `status ?? 'all'` 而不是直接放 status：
+ * 放 undefined 会让 ['issues',1,20,undefined] 与不带第四项的 key 指向
+ * 两个不同缓存，切换"全部"时会白跑一次请求。
+ *
+ * ⚠ status 只是**过滤条件**，不进请求体。后端也只支持这一个过滤维度
+ * （没有关键词、没有 level、没有时间范围），所以界面上不要多加控件。
+ */
+export function useIssues(page: number, pageSize: number, status?: IssueStatus) {
+  return useQuery({
+    queryKey: ['issues', page, pageSize, status ?? 'all'],
+    queryFn: () =>
+      request<PageResult<IssueRow>>(
+        '/v1/issues',
+        status ? { page, pageSize, status } : { page, pageSize },
+      ),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * 问题详情 + 其下事件（GET /api/v1/issues/:id）。
+ *
+ * 一次请求同时拿到 issue 与 events，所以详情页不需要发两次请求，
+ * 也就不会出现"问题信息到了、事件还在转圈"的半截界面。
+ *
+ * 这里也挂 placeholderData：详情页内部的事件翻页时要保留上一页，
+ * 否则表格会闪成空骨架。跨问题跳转不受影响 —— 从 /issues 到
+ * /issues/:id 是路由切换，IssueDetailPage 是重新挂载，新 observer
+ * 没有"上一份数据"可用，keepPreviousData 自然不会串到别的问题上。
+ */
+export function useIssue(id: string, page: number, pageSize: number) {
+  return useQuery({
+    queryKey: ['issue', id, page, pageSize],
+    queryFn: () => request<IssueDetail>(`/v1/issues/${id}`, { page, pageSize }),
+    placeholderData: keepPreviousData,
+    // id 为空时不发请求（详情页对非法地址做了兜底，不该让请求打到 /v1/issues/）
+    enabled: id !== '',
   })
 }

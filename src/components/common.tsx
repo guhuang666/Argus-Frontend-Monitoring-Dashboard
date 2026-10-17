@@ -2,6 +2,7 @@ import { Tag, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { asBreadcrumbs } from '../api/types'
 import type { Breadcrumb } from '../api/types'
+import { ISSUE_LEVEL_COLORS, ISSUE_STATUS_COLORS, ISSUE_STATUS_LABELS } from '../utils/issue'
 
 const { Text } = Typography
 
@@ -183,4 +184,19 @@ export function ExpandedPanel({ left, right }: { left: React.ReactNode; right: R
       <div style={{ flex: '1 1 320px', minWidth: 260 }}>{right}</div>
     </div>
   )
+}
+
+/**
+ * 问题状态标签。
+ *
+ * 未知状态（后端 varchar 加了新值、或人工改库）不吞掉：文案回退成原始字符串，
+ * 颜色回退成默认 Tag。看板宁可显示一个没见过的英文状态，也不该显示空白。
+ */
+export function IssueStatusTag({ value }: { value: string }) {
+  return <Tag color={ISSUE_STATUS_COLORS[value]}>{ISSUE_STATUS_LABELS[value] ?? value}</Tag>
+}
+
+/** 问题级别标签。同样对未知值兜底，且文案就是 level 本身，无需映射 */
+export function IssueLevelTag({ value }: { value: string }) {
+  return <Tag color={ISSUE_LEVEL_COLORS[value]}>{value}</Tag>
 }

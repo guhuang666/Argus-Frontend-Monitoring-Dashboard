@@ -5,6 +5,7 @@ const { Header, Content } = Layout
 
 const NAV_ITEMS = [
   { key: '/errors', label: '异常' },
+  { key: '/issues', label: '问题' },
   { key: '/performance', label: '性能' },
 ]
 
