@@ -13,6 +13,7 @@ import {
   StackBlock,
 } from '../components/common'
 import { formatInt, formatTime } from '../utils/format'
+import { useProjectId } from '../utils/project'
 
 /**
  * 性能指标列表。
@@ -126,10 +127,15 @@ const columns: TableColumnsType<PerformanceRow> = [
 ]
 
 export default function PerformancePage() {
+  const projectId = useProjectId()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
-  const { data, isPending, isError, error, isFetching, refetch } = usePerformanceMetrics(page, pageSize)
+  const { data, isPending, isError, error, isFetching, refetch } = usePerformanceMetrics(
+    projectId,
+    page,
+    pageSize,
+  )
 
   if (isError) {
     return (

@@ -8,6 +8,7 @@ import PageShell from '../components/PageShell'
 import { EllipsisText, EmptyValue, IssueLevelTag, IssueStatusTag } from '../components/common'
 import { formatInt, formatTime } from '../utils/format'
 import { ISSUE_STATUS_FILTER_OPTIONS } from '../utils/issue'
+import { projectPath, useProjectId } from '../utils/project'
 
 /**
  * 问题列表 —— worker 按指纹归并后的实体。
@@ -18,34 +19,41 @@ import { ISSUE_STATUS_FILTER_OPTIONS } from '../utils/issue'
  * 所以这里不做前端"假筛选"控件：点了没用的控件比没有控件更糟。
  *
  * 与异常事件页的分工：异常页看"一次发生了什么"，本页看"哪些错误在反复发生"。
+ *
+ * ── 为什么列定义是个函数而不是常量 ──────────────────────────────────────
+ * 标题列里要放详情页链接，而详情路径带项目前缀（/projects/:projectId/issues/:id）。
+ * 列定义是模块级常量、拿不到 hooks，所以把它做成"传进 projectId、返回列数组"的函数。
+ * 换成在 render 里调 useProjectId() 会违反 hooks 规则 —— 那些 render 是
+ * 普通函数调用，不是组件。
  */
-const columns: TableColumnsType<IssueRow> = [
-  {
-    title: '级别',
-    dataIndex: 'level',
-    width: 100,
-    render: (value: string) => <IssueLevelTag value={value} />,
-  },
-  {
-    title: '标题',
-    dataIndex: 'title',
-    // 不设固定宽度：标题是这一页的主信息，让它吃掉剩余空间。
-    // 库里是 VarChar(500)，不换行会把表格横向撑爆，所以用 wordBreak 允许断行。
-    render: (_value, row) => (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Link
-          to={`/issues/${row.id}`}
-          // 行本身也绑了跳转：不拦一下会触发两次 navigate
-          onClick={(event) => event.stopPropagation()}
-          style={{ wordBreak: 'break-all' }}
-        >
-          {row.title}
-        </Link>
-        <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', wordBreak: 'break-all' }}>
-          {row.fingerprint}
-        </span>
-      </div>
-    ),
+function buildColumns(projectId: string): TableColumnsType<IssueRow> {
+  return [
+    {
+      title: '级别',
+      dataIndex: 'level',
+      width: 100,
+      render: (value: string) => <IssueLevelTag value={value} />,
+    },
+    {
+      title: '标题',
+      dataIndex: 'title',
+      // 不设固定宽度：标题是这一页的主信息，让它吃掉剩余空间。
+      // 库里是 VarChar(500)，不换行会把表格横向撑爆，所以用 wordBreak 允许断行。
+      render: (_value, row) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Link
+            to={projectPath(projectId, `/issues/${row.id}`)}
+            // 行本身也绑了跳转：不拦一下会触发两次 navigate
+            onClick={(event) => event.stopPropagation()}
+            style={{ wordBreak: 'break-all' }}
+          >
+            {row.title}
+          </Link>
+          <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', wordBreak: 'break-all' }}>
+            {row.fingerprint}
+          </span>
+        </div>
+      ),
   },
   {
     title: '责任位置',
@@ -107,16 +115,24 @@ const columns: TableColumnsType<IssueRow> = [
     // 可空：M1 的 SDK 还不上报 release
     render: (value: string | null) => <EllipsisText value={value} width={100} />,
   },
-]
+  ]
+}
 
 export default function IssuesPage() {
   const navigate = useNavigate()
+  const projectId = useProjectId()
+  const columns = buildColumns(projectId)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   // undefined = 不过滤。用 'all' 当 UI 值，避免把 undefined 塞进 Segmented
   const [status, setStatus] = useState<IssueStatus | undefined>(undefined)
 
-  const { data, isPending, isError, error, isFetching, refetch } = useIssues(page, pageSize, status)
+  const { data, isPending, isError, error, isFetching, refetch } = useIssues(
+    projectId,
+    page,
+    pageSize,
+    status,
+  )
 
   if (isError) {
     return (
@@ -175,7 +191,7 @@ export default function IssuesPage() {
         loading={isPending || isFetching}
         // 整行可点进详情。标题里另有 <Link>，保留它才能中键/新标签页打开
         onRow={(row) => ({
-          onClick: () => navigate(`/issues/${row.id}`),
+          onClick: () => navigate(projectPath(projectId, `/issues/${row.id}`)),
           style: { cursor: 'pointer' },
         })}
         // 表格内部不再挂分页器：服务端分页的 current/total 都由上面的 state 驱动，

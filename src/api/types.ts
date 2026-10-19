@@ -21,6 +21,33 @@ export interface PageResult<T> {
   pageSize: number
 }
 
+/**
+ * 一个项目（GET /api/v1/projects 的 items 元素）。
+ *
+ * public_key 是**能公开**的那把钥匙：看板把它显示出来给人贴进代码。
+ * 私钥不在此接口里，也永远拿不到（库里只有 sha256）。
+ *
+ * public_key 可能为 null：项目建好了但还没生成密钥（比如建到一半失败）。
+ * 这种情况上报会 401，所以界面上要显眼地标出来，而不是显示成空白。
+ */
+export interface ProjectRow {
+  id: string
+  name: string
+  platform: string
+  sample_rate: number
+  rate_limit_per_sec: number
+  is_active: boolean
+  created_at: string
+  public_key: string | null
+  issue_count: number
+  event_count: number
+}
+
+/** GET /api/v1/projects 的响应（不分页：一个组织下的项目数是十几个量级） */
+export interface ProjectListResult {
+  items: ProjectRow[]
+}
+
 /** 采集通道，与后端 Prisma 的 Mechanism enum 一一对应 */
 export type Mechanism = 'onerror' | 'unhandledrejection' | 'resource'
 

@@ -18,6 +18,7 @@ import {
   StackBlock,
 } from '../components/common'
 import { formatInt, formatTime } from '../utils/format'
+import { projectPath, useProjectId } from '../utils/project'
 
 const { Text, Title } = Typography
 
@@ -105,16 +106,17 @@ export default function IssueDetailPage() {
   const navigate = useNavigate()
   const params = useParams()
   const issueId = params.id ?? ''
+  const projectId = useProjectId()
 
   // 事件列表自己的分页状态。改页码会连带重新请求详情接口（后端就是一个接口），
   // 但问题信息不会变，配合 keepPreviousData 表格也不会闪空。
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
-  const { data, isPending, isError, error, isFetching, refetch } = useIssue(issueId, page, pageSize)
+  const { data, isPending, isError, error, isFetching, refetch } = useIssue(projectId, issueId, page, pageSize)
 
   const backToList = (
-    <Button type="primary" onClick={() => navigate('/issues')}>
+    <Button type="primary" onClick={() => navigate(projectPath(projectId, '/issues'))}>
       返回问题列表
     </Button>
   )
@@ -126,7 +128,7 @@ export default function IssueDetailPage() {
           status="warning"
           title="缺少问题 ID"
           subTitle="请从问题列表点击进入详情页。"
-          extra={<Button onClick={() => navigate('/issues')}>返回问题列表</Button>}
+          extra={<Button onClick={() => navigate(projectPath(projectId, '/issues'))}>返回问题列表</Button>}
         />
       </PageShell>
     )
@@ -157,7 +159,7 @@ export default function IssueDetailPage() {
             status="warning"
             title="问题 ID 格式不正确"
             subTitle="问题 id 是 UUID，请从问题列表进入详情页。"
-            extra={<Button onClick={() => navigate('/issues')}>返回问题列表</Button>}
+            extra={<Button onClick={() => navigate(projectPath(projectId, '/issues'))}>返回问题列表</Button>}
           />
         </PageShell>
       )
@@ -184,7 +186,7 @@ export default function IssueDetailPage() {
       description={
         <span>
           {isFetching && <span style={{ marginRight: 8, color: 'rgba(0,0,0,0.45)' }}>刷新中…</span>}
-          <Button size="small" onClick={() => navigate('/issues')}>
+          <Button size="small" onClick={() => navigate(projectPath(projectId, '/issues'))}>
             返回列表
           </Button>
           <Button size="small" style={{ marginLeft: 8 }} onClick={() => void refetch()}>

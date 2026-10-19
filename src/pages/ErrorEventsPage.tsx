@@ -15,6 +15,7 @@ import {
   StackBlock,
 } from '../components/common'
 import { formatInt, formatTime } from '../utils/format'
+import { useProjectId } from '../utils/project'
 
 /**
  * 异常事件列表。
@@ -82,10 +83,15 @@ const columns: TableColumnsType<ErrorEventRow> = [
 ]
 
 export default function ErrorEventsPage() {
+  const projectId = useProjectId()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
-  const { data, isPending, isError, error, isFetching, refetch } = useErrorEvents(page, pageSize)
+  const { data, isPending, isError, error, isFetching, refetch } = useErrorEvents(
+    projectId,
+    page,
+    pageSize,
+  )
 
   // 首次加载还没有任何数据时，不渲染空表：让位给错误或加载提示
   if (isError) {
