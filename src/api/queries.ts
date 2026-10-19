@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { fetchMe } from './auth'
 import { request } from './client'
 import type {
   ErrorEventRow,
@@ -21,6 +22,21 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
 /** 与后端 PageQueryDto 的默认值一致 */
 export const DEFAULT_PAGE_SIZE = 20
+
+/**
+ * 当前登录用户（GET /api/v1/auth/me）。
+ *
+ * 只在已登录的布局里调用（RequireAuth 之后），所以不需要 enabled 判断。
+ * 缓存 5 分钟：用户信息几乎不变，而它挂在最外层，每次导航都重拉一遍没意义。
+ * 登录/登出时会 queryClient.clear()，所以换账号不会串。
+ */
+export function useMe() {
+  return useQuery({
+    queryKey: ['me'],
+    queryFn: fetchMe,
+    staleTime: 5 * 60_000,
+  })
+}
 
 /**
  * 项目列表（GET /api/v1/projects）。

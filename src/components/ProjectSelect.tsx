@@ -1,10 +1,12 @@
-import { Alert, Select, Tag, Tooltip } from 'antd'
+import { Alert, Button, Select, Space, Tag, Tooltip } from 'antd'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useProjects } from '../api/queries'
 import { projectPath, rememberProjectId, useProjectId } from '../utils/project'
+import CreateProjectModal from './CreateProjectModal'
 
 /**
- * 顶部项目切换器。
+ * 顶部项目切换器 + 新建入口。
  *
  * ── 为什么它必须存在（而不是"以后再加"）──
  * 从 S2 起，上报靠公钥区分项目，事件、问题、性能全都带 project_id。
@@ -15,12 +17,18 @@ import { projectPath, rememberProjectId, useProjectId } from '../utils/project'
  * issue id 是全局唯一的 UUID，理论上可以直接带过去，但那个问题属于**另一个项目**：
  * 后端按 (id, projectId) 定位，会返回 404。让用户看到"问题不存在"容易误解成
  * "问题被删了"。退回到列表更符合预期。
+ *
+ * ── 为什么"新建项目"按钮在这里 ──
+ * MVP 阶段没有独立的设置页，而"建项目"这个动作天然发生在"我要换个项目"的时候。
+ * 放在下拉框旁边，是当前位置能给出的最短路径。权限不足（member）时后端会给 403，
+ * 错误会显示在弹窗里 —— 前端不预先藏按钮，因为"藏了但后端没拦"比"显示了但被拒"更危险。
  */
 export default function ProjectSelect() {
   const projectId = useProjectId()
   const { data, isPending, isError, error } = useProjects()
   const navigate = useNavigate()
   const location = useLocation()
+  const [createOpen, setCreateOpen] = useState(false)
 
   if (isError) {
     // 切换器挂了不该拖垮整个页面：导航和内容区还能用（虽然都会报错），
@@ -42,36 +50,44 @@ export default function ProjectSelect() {
 
   return (
     <>
-      <Select
-        // 受控 + 显式显示当前项目名：projectId 在列表里找不到时（手工改了地址），
-        // 直接把那个 id 显示出来，比显示空白更容易看出问题
-        value={projectId !== '' ? projectId : undefined}
-        loading={isPending}
-        placeholder="选择项目"
-        style={{ width: 200 }}
-        options={items.map((item) => ({
-          value: item.id,
-          label: item.name,
-        }))}
-        // 切到当前项目相当于没操作，不要为此触发一次导航（会丢掉滚动位置、
-        // 也会让详情页被无谓地重挂载）
-        onChange={(next) => {
-          if (next === projectId) return
-          rememberProjectId(next)
+      <Space size={8}>
+        <Select
+          // 受控 + 显式显示当前项目名：projectId 在列表里找不到时（手工改了地址），
+          // 直接把那个 id 显示出来，比显示空白更容易看出问题
+          value={projectId !== '' ? projectId : undefined}
+          loading={isPending}
+          placeholder="选择项目"
+          style={{ width: 200 }}
+          options={items.map((item) => ({
+            value: item.id,
+            label: item.name,
+          }))}
+          // 切到当前项目相当于没操作，不要为此触发一次导航（会丢掉滚动位置、
+          // 也会让详情页被无谓地重挂载）
+          onChange={(next) => {
+            if (next === projectId) return
+            rememberProjectId(next)
 
-          // 把 /projects/<旧id> 之后的部分保留下来，但详情页退回到列表
-          const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/errors'
-          const safeRest = /^\/issues\//.test(rest) ? '/issues' : rest
-          navigate(projectPath(next, safeRest))
-        }}
-        notFoundContent={isPending ? '加载中…' : '没有项目'}
-      />
+            // 把 /projects/<旧id> 之后的部分保留下来，但详情页退回到列表
+            const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/errors'
+            const safeRest = /^\/issues\//.test(rest) ? '/issues' : rest
+            navigate(projectPath(next, safeRest))
+          }}
+          notFoundContent={isPending ? '加载中…' : '没有项目'}
+        />
 
-      {current !== undefined && current.public_key === null && (
-        <Tooltip title="这个项目还没有密钥，上报会一律 401。用 npm run project:new 新建项目会同时生成密钥">
-          <Tag color="red">无密钥</Tag>
-        </Tooltip>
-      )}
+        <Button size="small" onClick={() => setCreateOpen(true)}>
+          新建项目
+        </Button>
+
+        {current !== undefined && current.public_key === null && (
+          <Tooltip title="这个项目还没有密钥，上报会一律 401">
+            <Tag color="red">无密钥</Tag>
+          </Tooltip>
+        )}
+      </Space>
+
+      <CreateProjectModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   )
 }
