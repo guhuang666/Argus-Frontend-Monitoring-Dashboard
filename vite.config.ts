@@ -24,4 +24,7 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    sourcemap: 'hidden',   // ← 就这一行
+  },
 })

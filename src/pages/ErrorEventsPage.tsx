@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, useErrorEvents } from '../api/queries'
 import type { ErrorEventRow } from '../api/types'
 import PageShell from '../components/PageShell'
+import FramesView from '../components/FramesView'
 import {
   BreadcrumbList,
   DetailItem,
@@ -149,7 +150,9 @@ export default function ErrorEventsPage() {
                     <div style={{ marginBottom: 4, color: 'rgba(0,0,0,0.45)' }}>完整错误信息</div>
                     <div style={{ wordBreak: 'break-all' }}>{row.message}</div>
                   </div>
-                  <StackBlock text={row.stack} />
+                  {/* M3：与问题详情页保持一致 —— 先看解析后的帧，原文留在下面 */}
+                  <FramesView raw={row.stacktrace_frames} />
+                  <StackBlock label="堆栈原文（未解析）" text={row.stack} />
                   <BreadcrumbList raw={row.breadcrumbs} />
                 </div>
               }
@@ -165,10 +168,6 @@ export default function ErrorEventsPage() {
                   <DetailItem label="environment" value={row.environment} />
                   <DetailItem label="sdk" value={`${row.sdk_name ?? '—'} ${row.sdk_version ?? ''}`.trim()} />
                   <DetailItem label="user_agent" value={row.user_agent} />
-                  <DetailItem
-                    label="stacktrace_frames"
-                    value={row.stacktrace_frames ? JSON.stringify(row.stacktrace_frames) : null}
-                  />
                   <DetailItem
                     label="tags / extra"
                     value={

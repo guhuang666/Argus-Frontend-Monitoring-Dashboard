@@ -206,3 +206,82 @@ export interface IssueDetail {
   issue: IssueRow
   events: PageResult<IssueDetailEventRow>
 }
+
+/* ==========================================================================
+ * Sourcemap 帧（M3）
+ * ==========================================================================
+ * stacktrace_frames 是 jsonb，**有两种形状**，由问题的 grouping_version 决定：
+ *
+ *   v1-raw          → RawFrame[]           只有压缩后的位置
+ *   v2-symbolicated → SymbolicatedFrame[]  压缩位置 + 还原后的源码位置 + 源码上下文
+ *
+ * 判别方式：帧上带 `resolved` 字段就是 v2（v1 的帧从来没写过这个字段）。
+ * 两个形状与后端 grouping/symbolicate.ts 的同名接口逐字段对应。
+ * ========================================================================*/
+
+/** 压缩后的位置。v1 落库的就是这个形状（后端 fingerprint.ts 的 Frame） */
+export interface RawFrame {
+  file: string
+  /** 压缩后的函数名，通常是无意义的短名（r / e / t），匿名帧为 null */
+  fn: string | null
+  /** 压缩产物里的行号（1-based） */
+  line: number
+  /** 压缩产物里的列号（1-based） */
+  col: number
+}
+
+/** 源码上下文（后端 symbolicate.ts 的 SourceContext） */
+export interface SourceContext {
+  /** 上下文各行的内容，不含行号前缀 */
+  lines: string[]
+  /** 出错行在 lines 里的下标（0-based） */
+  errorIndex: number
+  /** 出错行的绝对行号（1-based） */
+  errorLine: number
+  /** lines[0] 的绝对行号（1-based） */
+  startLine: number
+}
+
+/** 还原后的帧（v2）。后端 symbolicate.ts 的 SymbolicatedFrame */
+export interface SymbolicatedFrame extends RawFrame {
+  /** 归一化后的产物路径，如 /assets/index-B3obYmGb.js */
+  artifactPath: string | null
+  /** 是否成功还原到源码位置 */
+  resolved: boolean
+  /** 源码文件，如 src/pages/OrderList.tsx */
+  source: string | null
+  /** 源码行号（1-based） */
+  sourceLine: number | null
+  /** 源码列号（1-based，后端已从 0-based 转回） */
+  sourceCol: number | null
+  /** 源码里的原始函数名 */
+  name: string | null
+  /** 源码上下文；map 没内嵌源码时为 null */
+  context: SourceContext | null
+}
+
+/** 两种形状的并集：渲染层只关心"这一帧有没有源码信息" */
+export type FrameRow = RawFrame | SymbolicatedFrame
+
+/** 判别 v2：带 resolved 的一定是符号化后的帧 */
+export function isSymbolicatedFrame(frame: FrameRow): frame is SymbolicatedFrame {
+  return typeof (frame as SymbolicatedFrame).resolved === 'boolean'
+}
+
+/**
+ * 把 unknown 的 jsonb 收敛成帧数组。
+ *
+ * 与 asBreadcrumbs 同一立场：不信任后端返回的形状（历史数据可能是旧版本写的、
+ * 也可能被人工改过）。逐项检查最低限度的必要字段，坏项直接丢掉 ——
+ * 让界面降级成"没有帧"，而不是整页白屏。
+ */
+export function asFrames(value: unknown): FrameRow[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(
+    (item): item is FrameRow =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof (item as RawFrame).file === 'string' &&
+      typeof (item as RawFrame).line === 'number',
+  )
+}

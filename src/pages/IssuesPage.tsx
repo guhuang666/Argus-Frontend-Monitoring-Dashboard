@@ -1,4 +1,4 @@
-import { Alert, Button, Segmented, Table } from 'antd'
+import { Alert, Button, Segmented, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -50,9 +50,20 @@ const columns: TableColumnsType<IssueRow> = [
   {
     title: '责任位置',
     dataIndex: 'culprit',
-    width: 220,
+    width: 240,
     // 可空：调用栈为空（resource 通道、被裁剪过的 stack）时后端算不出责任位置
-    render: (value: string | null) => <EllipsisText value={value} width={200} />,
+    render: (_value, row) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <EllipsisText value={row.culprit} width={200} />
+        {/* FR-3.9：让用户一眼看出"这条点进去有没有源码可看"
+            —— 未符号化时 culprit 是压缩产物位置（index.js:r 这种），别让人误以为是源码 */}
+        {row.grouping_version === 'v1-raw' && (
+          <Tag color="warning" style={{ marginInlineEnd: 0, width: 'fit-content' }}>
+            未符号化
+          </Tag>
+        )}
+      </div>
+    ),
   },
   {
     title: '状态',

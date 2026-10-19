@@ -1,9 +1,10 @@
-import { Alert, Button, Descriptions, Divider, Flex, Result, Table, Typography } from 'antd'
+import { Alert, Button, Descriptions, Divider, Flex, Result, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, useIssue } from '../api/queries'
 import type { IssueDetailEventRow } from '../api/types'
+import FramesView from '../components/FramesView'
 import PageShell from '../components/PageShell'
 import {
   BreadcrumbList,
@@ -197,12 +198,27 @@ export default function IssueDetailPage() {
       ) : (
         <Flex vertical gap={24}>
           <div>
-            <Title level={4} style={{ margin: 0, wordBreak: 'break-all' }}>
-              {issue.title}
-            </Title>
+            <Flex align="center" gap={8} wrap>
+              <Title level={4} style={{ margin: 0, wordBreak: 'break-all' }}>
+                {issue.title}
+              </Title>
+              {/* FR-3.9：降级必须显式标注，否则用户会以为这就是源码位置 */}
+              {issue.grouping_version === 'v1-raw' && (
+                <Tag color="warning" style={{ marginInlineEnd: 0 }}>
+                  未符号化
+                </Tag>
+              )}
+            </Flex>
             <Text type="secondary" style={{ wordBreak: 'break-all' }}>
               {issue.culprit ?? '责任位置未知（调用栈为空时无法定位）'}
             </Text>
+            {issue.grouping_version === 'v1-raw' && (
+              <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 4 }}>
+                {`这条问题归并时没有匹配到 Sourcemap，位置来自压缩产物。上传对应版本（${
+                  issue.last_release ?? '未上报版本'
+                }）的 Sourcemap 后，新事件会自动还原。`}
+              </div>
+            )}
           </div>
 
           <Descriptions
@@ -314,7 +330,9 @@ export default function IssueDetailPage() {
                           </div>
                           <div style={{ wordBreak: 'break-all' }}>{row.message}</div>
                         </div>
-                        <StackBlock text={row.stack} />
+                        {/* M3：优先展示解析后的帧（可能已还原到源码）；原文保留在下面 */}
+                        <FramesView raw={row.stacktrace_frames} />
+                        <StackBlock label="堆栈原文（未解析）" text={row.stack} />
                         <BreadcrumbList raw={row.breadcrumbs} />
                       </div>
                     }
@@ -328,15 +346,6 @@ export default function IssueDetailPage() {
                         <DetailItem label="release" value={row.release} />
                         <DetailItem label="environment" value={row.environment} />
                         <DetailItem label="user_agent" value={row.user_agent} />
-                        <DetailItem
-                          label="stacktrace_frames"
-                          value={
-                            // jsonb 列，形状由 SDK 决定：只判"有没有值"，不假设结构
-                            row.stacktrace_frames
-                              ? JSON.stringify(row.stacktrace_frames)
-                              : null
-                          }
-                        />
                       </div>
                     }
                   />
