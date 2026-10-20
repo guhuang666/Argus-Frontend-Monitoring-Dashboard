@@ -23,6 +23,14 @@ const NAV_ITEMS = [
 /**
  * 全局外框：顶部导航 + 项目切换器 + 用户菜单 + 内容区。
  *
+ * ── 两套顶栏，靠路由切换 ────────────────────────────────────────────────
+ *   项目列表页（`/`）：只有 logo + 用户菜单
+ *   项目内页面       ：logo + 「← 所有项目」+ 项目切换器 + 异常/问题/性能 + 用户菜单
+ *
+ * 为什么列表页要把切换器和菜单藏起来：它们全都依赖 projectId，
+ * 在"还没选项目"的地方摆着，点了要么没反应、要么替你随便挑一个 ——
+ * 两种都比不显示更糟。列表页的主任务是"选一个项目"，别的东西都是噪音。
+ *
  * 导航用 antd Menu 只为取它的视觉，实际跳转交给 react-router 的 NavLink ——
  * 这样地址栏、前进后退、刷新都正常，不依赖组件库自己的路由集成。
  */
@@ -31,6 +39,9 @@ export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { data: me } = useMe()
+
+  // 是否在某个项目内。用它同时决定"显示哪套顶栏"和"高亮哪一项"
+  const inProject = location.pathname.startsWith('/projects/')
 
   // 高亮哪一项：先把 "/projects/<id>" 前缀去掉，剩下的按路径段前缀匹配。
   // 用去前缀后的相对路径、而不是直接匹配全路径 —— 项目 id 是动态的，
@@ -66,7 +77,12 @@ export default function AppLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div
+        {/*
+          logo 本身是指回项目列表的链接 —— 这是"从项目里退出来"最自然的动作，
+          比再放一个专门的按钮更符合肌肉记忆（大多数后台都是点 logo 回首页）。
+        */}
+        <NavLink
+          to="/"
           style={{
             color: '#fff',
             fontSize: 16,
@@ -75,25 +91,43 @@ export default function AppLayout() {
           }}
         >
           Argus 看板
-        </div>
+        </NavLink>
 
-        <ProjectSelect />
+        {inProject && (
+          <>
+            <NavLink
+              to="/"
+              style={{
+                color: 'rgba(255,255,255,0.7)',
+                fontSize: 13,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ← 所有项目
+            </NavLink>
 
-        {/*
-          位置放在切换器右边：先选项目、再选页面，顺序与人的动作一致。
-          label 里用 NavLink 而不是 onClick={() => navigate()}：前者是真正的
-          <a href>，中键新标签页打开、右键复制链接都正常可用。
-        */}
-        <Menu
-          theme="dark"
-          mode="horizontal"
-          selectedKeys={[selectedKey]}
-          style={{ flex: 1, minWidth: 0 }}
-          items={NAV_ITEMS.map((item) => ({
-            key: item.key,
-            label: <NavLink to={projectPath(projectId, item.key)}>{item.label}</NavLink>,
-          }))}
-        />
+            <ProjectSelect />
+
+            {/*
+              位置放在切换器右边：先选项目、再选页面，顺序与人的动作一致。
+              label 里用 NavLink 而不是 onClick={() => navigate()}：前者是真正的
+              <a href>，中键新标签页打开、右键复制链接都正常可用。
+            */}
+            <Menu
+              theme="dark"
+              mode="horizontal"
+              selectedKeys={[selectedKey]}
+              style={{ flex: 1, minWidth: 0 }}
+              items={NAV_ITEMS.map((item) => ({
+                key: item.key,
+                label: <NavLink to={projectPath(projectId, item.key)}>{item.label}</NavLink>,
+              }))}
+            />
+          </>
+        )}
+
+        {/* 列表页没有菜单占位，需要一根弹性撑杆把用户菜单推到右边 */}
+        {!inProject && <div style={{ flex: 1 }} />}
 
         <Dropdown
           menu={{

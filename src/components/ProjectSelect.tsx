@@ -2,7 +2,7 @@ import { Alert, Button, Select, Space, Tag, Tooltip } from 'antd'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useProjects } from '../api/queries'
-import { projectPath, rememberProjectId, useProjectId } from '../utils/project'
+import { projectPath, useProjectId } from '../utils/project'
 import CreateProjectModal from './CreateProjectModal'
 
 /**
@@ -66,7 +66,6 @@ export default function ProjectSelect() {
           // 也会让详情页被无谓地重挂载）
           onChange={(next) => {
             if (next === projectId) return
-            rememberProjectId(next)
 
             // 把 /projects/<旧id> 之后的部分保留下来，但详情页退回到列表
             const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/errors'

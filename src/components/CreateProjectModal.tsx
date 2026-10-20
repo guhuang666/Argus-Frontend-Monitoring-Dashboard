@@ -93,12 +93,11 @@ export default function CreateProjectModal({
               </Button>,
             ]
           : [
-              <Button key="stay" onClick={close}>
-                留在这里
-              </Button>,
+              // 主按钮是"关闭"而不是"进入项目"：
+              // 这个弹窗现在主要从**项目列表页**打开，用户建完多半想先看一眼
+              // 新卡片有没有出现在列表里。自动跳进新项目会让他看不到自己刚建的东西。
               <Button
                 key="go"
-                type="primary"
                 onClick={() => {
                   const id = created.project.id
                   close()
@@ -106,6 +105,9 @@ export default function CreateProjectModal({
                 }}
               >
                 进入这个项目
+              </Button>,
+              <Button key="stay" type="primary" onClick={close}>
+                我已保存，返回列表
               </Button>,
             ]
       }

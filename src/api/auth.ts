@@ -21,17 +21,19 @@ export interface LoginResult {
   user: AuthUserRow
 }
 
+/**
+ * 注册结果。
+ *
+ * ⚠️ **没有 project / secret_key_once** —— 注册只建账号 + 组织。
+ * 项目和密钥要走 POST /api/v1/projects 单独创建。
+ * 这么设计的原因见后端 auth.service.ts 的 register() 注释：
+ * 替用户先建一个叫「默认项目」的东西、再发一对他还没准备好的密钥，
+ * 结果是第一个项目永远是没意义的名字，而私钥在那一次几乎没人抄下来。
+ */
 export interface RegisterResult extends LoginResult {
   organization: { id: string; name: string; slug: string }
   /** MVP-B：角色挂在用户上。注册者是自己组织的 owner */
   role: string
-  project: { id: string; name: string; public_key: string }
-  /**
-   * 明文私钥，**只有注册这一次能拿到**（库里只有 sha256）。
-   * 字段名带 `_once` 就是提醒：它不是可以再查一次的东西，
-   * 界面上必须在那一次让用户复制走。
-   */
-  secret_key_once: string
 }
 
 export interface MeResult {
