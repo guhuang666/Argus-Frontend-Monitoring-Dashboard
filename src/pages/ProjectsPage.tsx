@@ -148,7 +148,7 @@ function ProjectCard({ item }: { item: ProjectRow }) {
       }
       // 整张卡片可点：面积大，比只点按钮顺手。按钮保留是为了"明确可点的提示"
       hoverable
-      onClick={() => navigate(projectPath(item.id, '/errors'))}
+      onClick={() => navigate(projectPath(item.id, '/overview'))}
       style={{ cursor: 'pointer', height: '100%' }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -183,6 +183,23 @@ function ProjectCard({ item }: { item: ProjectRow }) {
           </span>
         </div>
 
+        {/*
+          丢件数（FR-6.4）：只在"确实丢了"或"查不到"时才显示。
+          为 0 时整个不渲染 —— 卡片上多一个"今日被限流 0 条"只会增加噪音。
+        */}
+        {item.dropped_today === null ? (
+          <Text type="warning" style={{ fontSize: 12 }}>
+            限流计数暂不可用（Redis 未连接）
+          </Text>
+        ) : item.dropped_today > 0 ? (
+          <Text type="danger" style={{ fontSize: 12 }}>
+            今日被限流丢弃 {formatInt(item.dropped_today)} 条
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              （上限 {formatInt(item.rate_limit_per_sec)} 次/秒）
+            </Text>
+          </Text>
+        ) : null}
+
         <Text type="secondary" style={{ fontSize: 12 }}>
           创建于 {formatTime(item.created_at)}
         </Text>
@@ -193,7 +210,7 @@ function ProjectCard({ item }: { item: ProjectRow }) {
           style={{ paddingLeft: 0, alignSelf: 'flex-start' }}
           onClick={(event) => {
             event.stopPropagation()
-            navigate(projectPath(item.id, '/errors'))
+            navigate(projectPath(item.id, '/overview'))
           }}
         >
           进入项目 →

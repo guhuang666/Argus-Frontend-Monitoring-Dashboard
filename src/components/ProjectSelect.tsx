@@ -68,7 +68,7 @@ export default function ProjectSelect() {
             if (next === projectId) return
 
             // 把 /projects/<旧id> 之后的部分保留下来，但详情页退回到列表
-            const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/errors'
+            const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/overview'
             const safeRest = /^\/issues\//.test(rest) ? '/issues' : rest
             navigate(projectPath(next, safeRest))
           }}

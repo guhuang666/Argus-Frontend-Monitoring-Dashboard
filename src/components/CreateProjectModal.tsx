@@ -101,7 +101,7 @@ export default function CreateProjectModal({
                 onClick={() => {
                   const id = created.project.id
                   close()
-                  navigate(projectPath(id, '/errors'))
+                  navigate(projectPath(id, '/overview'))
                 }}
               >
                 进入这个项目

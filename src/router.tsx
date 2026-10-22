@@ -5,6 +5,7 @@ import ErrorEventsPage from './pages/ErrorEventsPage'
 import IssueDetailPage from './pages/IssueDetailPage'
 import IssuesPage from './pages/IssuesPage'
 import LoginPage from './pages/LoginPage'
+import OverviewPage from './pages/OverviewPage'
 import PerformancePage from './pages/PerformancePage'
 import ProjectsPage from './pages/ProjectsPage'
 
@@ -49,14 +50,16 @@ export const router = createBrowserRouter([
           {
             path: 'projects/:projectId',
             children: [
-              // /projects/xxx 本身没有页面，统一进异常列表
-              { index: true, element: <Navigate to="errors" replace /> },
+              // /projects/xxx 本身没有页面，统一进概览（批次 C 起：先进"整体怎么样"，
+              // 再看具体哪条异常）
+              { index: true, element: <Navigate to="overview" replace /> },
+              { path: 'overview', element: <OverviewPage /> },
               { path: 'errors', element: <ErrorEventsPage /> },
               { path: 'issues', element: <IssuesPage /> },
               { path: 'issues/:id', element: <IssueDetailPage /> },
               { path: 'performance', element: <PerformancePage /> },
-              // 项目内的未知子路径：回到这个项目的异常列表，而不是把用户扔到别的项目
-              { path: '*', element: <Navigate to="errors" replace /> },
+              // 项目内的未知子路径：回到这个项目的概览，而不是把用户扔到别的项目
+              { path: '*', element: <Navigate to="overview" replace /> },
             ],
           },
           // 兜底：手输错地址 → 回项目列表，而不是渲染一个"看起来正常"的页面

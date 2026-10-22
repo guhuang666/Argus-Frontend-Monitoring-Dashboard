@@ -6,6 +6,8 @@ import type {
   IssueDetail,
   IssueRow,
   IssueStatus,
+  OverviewRange,
+  OverviewResult,
   PageResult,
   PerformanceRow,
   ProjectListResult,
@@ -146,5 +148,23 @@ export function useIssue(projectId: string, id: string, page: number, pageSize: 
     placeholderData: keepPreviousData,
     // id 为空时不发请求（详情页对非法地址做了兜底，不该让请求打到 /v1/issues/）
     enabled: projectId !== '' && id !== '',
+  })
+}
+
+/**
+ * 概览统计（GET /api/v1/stats/overview）。
+ *
+ * range 必须进 queryKey：它和 projectId 一样是"决定这批数字属于谁"的参数，
+ * 漏了就会出现"切到 7 天，图还是 24 小时那张"——而且不报错，最难发现。
+ *
+ * 挂 keepPreviousData：切换范围时先留着上一张图，新数据到位再替换，
+ * 否则图表会先被卸载成空骨架、再重新长出来，视觉上闪一下。
+ */
+export function useOverview(projectId: string, range: OverviewRange) {
+  return useQuery({
+    queryKey: ['overview', projectId, range],
+    queryFn: () => request<OverviewResult>('/v1/stats/overview', { projectId, range }),
+    placeholderData: keepPreviousData,
+    enabled: projectId !== '',
   })
 }

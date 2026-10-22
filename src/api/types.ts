@@ -41,6 +41,13 @@ export interface ProjectRow {
   public_key: string | null
   issue_count: number
   event_count: number
+  /**
+   * 今天因限流被丢掉的条数（FR-6.4）。
+   *
+   * `null` 表示**查不到**（存计数的 Redis 不可用），与 `0`（确实没丢）是两件事。
+   * 界面要分开显示，否则"Redis 挂了"看起来会像"一切正常"。
+   */
+  dropped_today: number | null
 }
 
 /** GET /api/v1/projects 的响应（不分页：一个组织下的项目数是十几个量级） */
@@ -311,4 +318,39 @@ export function asFrames(value: unknown): FrameRow[] {
       typeof (item as RawFrame).file === 'string' &&
       typeof (item as RawFrame).line === 'number',
   )
+}
+
+/**
+ * 概览页支持的时间范围（与后端 OverviewQueryDto 的 OVERVIEW_RANGES 一一对应）。
+ *
+ * 没有 1h：趋势读的是小时聚合表，1 小时窗口只会有 1~2 个点。
+ * 后端会直接 400 拒绝，所以前端的选项也必须与此严格一致。
+ */
+export type OverviewRange = '24h' | '7d' | '30d'
+
+/** 趋势上的一个点。t 是桶起点（ISO 8601 UTC 字符串），events 是该桶内的事件数 */
+export interface OverviewTrendPoint {
+  t: string
+  events: number
+}
+
+/** GET /api/v1/stats/overview 的响应 */
+export interface OverviewResult {
+  range: OverviewRange
+  /** 窗口起点（含），ISO 8601 UTC */
+  from: string
+  /** 窗口终点（不含），ISO 8601 UTC */
+  to: string
+  /** 每个点代表多长时间，前端拿它决定 x 轴标签格式 */
+  bucket: 'hour' | 'day'
+  summary: {
+    /** 窗口内事件条数 */
+    events: number
+    /** 窗口内出现过的问题数 */
+    issues: number
+    /** 窗口内首次出现的问题数 */
+    new_issues: number
+  }
+  /** 等距补零后的趋势：没有事件的小时也会有一个 events=0 的点 */
+  trend: OverviewTrendPoint[]
 }

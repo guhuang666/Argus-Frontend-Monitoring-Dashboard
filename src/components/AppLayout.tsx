@@ -13,8 +13,11 @@ const { Text } = Typography
 /**
  * 导航项。key 是**项目内的相对路径**，实际跳转时再拼上 /projects/:projectId。
  * 这样导航表本身与"当前是哪个项目"无关，切项目时只需要重新拼接。
+ *
+ * 顺序：先看整体（概览），再看明细（异常）。人的认知路径本来就是"多不多 → 哪一条"。
  */
 const NAV_ITEMS = [
+  { key: '/overview', label: '概览' },
   { key: '/errors', label: '异常' },
   { key: '/issues', label: '问题' },
   { key: '/performance', label: '性能' },
@@ -47,7 +50,7 @@ export default function AppLayout() {
   // 用去前缀后的相对路径、而不是直接匹配全路径 —— 项目 id 是动态的，
   // 写死 startsWith('/issues') 在 /projects/xxx/issues 上永远不成立。
   const rest = location.pathname.replace(/^\/projects\/[^/]+/, '') || '/'
-  const selectedKey = NAV_ITEMS.find((item) => rest.startsWith(item.key))?.key ?? '/errors'
+  const selectedKey = NAV_ITEMS.find((item) => rest.startsWith(item.key))?.key ?? '/overview'
 
   /**
    * 退出登录。
