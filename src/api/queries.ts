@@ -9,7 +9,9 @@ import type {
   OverviewRange,
   OverviewResult,
   PageResult,
+  PerfMetric,
   PerformanceRow,
+  PerformanceTrendResult,
   ProjectListResult,
 } from './types'
 
@@ -164,6 +166,35 @@ export function useOverview(projectId: string, range: OverviewRange) {
   return useQuery({
     queryKey: ['overview', projectId, range],
     queryFn: () => request<OverviewResult>('/v1/stats/overview', { projectId, range }),
+    placeholderData: keepPreviousData,
+    enabled: projectId !== '',
+  })
+}
+
+/**
+ * 性能分位趋势（GET /api/v1/stats/performance）。
+ *
+ * metric 与 range **都必须进 queryKey**，而且一个都不能少：
+ * 漏掉任何一个，切换那个下拉框时 React Query 都会认为"参数没变、缓存有效"，
+ * 图会原封不动地留在原地 —— 看起来完全正常，只是数据是上一次的。
+ * 这是本项目里最难靠肉眼发现的一类 bug（与 projectId 漏进 key 同级）。
+ *
+ * 挂 keepPreviousData：切指标/切范围时先留着上一张图，新数据到位再替换。
+ * 不挂的话图会先被卸载成骨架、再重新长出来，每次切换都闪一下。
+ * 配套可以用 isPlaceholderData 区分"这是旧图"。
+ *
+ * 参数顺序按调用方的阅读习惯排：先决定"看哪个项目"（外层），
+ * 再决定"看哪段时间"，最后才是"看哪个指标"（最内层）。
+ */
+export function usePerformanceTrend(
+  projectId: string,
+  range: OverviewRange,
+  metric: PerfMetric,
+) {
+  return useQuery({
+    queryKey: ['performance-trend', projectId, range, metric],
+    queryFn: () =>
+      request<PerformanceTrendResult>('/v1/stats/performance', { projectId, metric, range }),
     placeholderData: keepPreviousData,
     enabled: projectId !== '',
   })

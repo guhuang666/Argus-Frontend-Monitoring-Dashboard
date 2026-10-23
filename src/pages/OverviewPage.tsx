@@ -1,12 +1,13 @@
-import { Alert, Card, Col, Empty, Row, Segmented, Skeleton, Space, Statistic, Typography } from 'antd'
+import { Alert, Card, Col, Empty, Row, Segmented, Skeleton, Space, Statistic, Table, Typography } from 'antd'
+import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useOverview } from '../api/queries'
-import type { OverviewRange } from '../api/types'
+import type { OverviewRange, TopIssue } from '../api/types'
 import PageShell from '../components/PageShell'
 import TrendChart from '../components/TrendChart'
-import { formatTime } from '../utils/format'
-import { useProjectId } from '../utils/project'
+import { formatInt, formatTime } from '../utils/format'
+import { projectPath, useProjectId } from '../utils/project'
 
 const { Text } = Typography
 
@@ -62,6 +63,8 @@ export default function OverviewPage() {
   const labels = (data?.trend ?? []).map((point) => dayjs(point.t).format(labelFormat(range)))
   const values = (data?.trend ?? []).map((point) => point.events)
   const hasData = data !== undefined && data.summary.events > 0
+  // 卡片的标题要跟着时间范围走，否则切到 7d 后标题还写着"近 24 小时"
+  const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? ''
 
   return (
     <PageShell
@@ -130,6 +133,38 @@ export default function OverviewPage() {
               />
             )}
           </Card>
+
+          {/*
+            Top N 两个榜（FR-8.2）。刻意并排放：它们回答的是同一件事的两面 ——
+            "谁最吵" 和 "谁最伤人"，而这两个问题的答案经常不是同一个问题。
+          */}
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} lg={12}>
+              <Card title={`最常发生（${rangeLabel}）`}>
+                <TopTable
+                  projectId={projectId}
+                  rows={data?.top?.byEvents ?? []}
+                  highlight="events"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card
+                title={`新增受影响用户（${rangeLabel}）`}
+                extra={
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    口径：首次影响落在该时间段
+                  </Text>
+                }
+              >
+                <TopTable
+                  projectId={projectId}
+                  rows={data?.top?.byUsers ?? []}
+                  highlight="users"
+                />
+              </Card>
+            </Col>
+          </Row>
         </>
       )}
     </PageShell>
@@ -150,4 +185,85 @@ function labelFormat(range: OverviewRange): string {
   if (range === '30d') return 'MM-DD'
   if (range === '7d') return 'MM-DD HH:mm'
   return 'HH:mm'
+}
+
+/**
+ * 榜单表格（两个榜共用）。
+ *
+ * ── 为什么不抽到 components/ 里 ──────────────────────────────────────────
+ * 它只服务这一个页面，而且"哪一列是排序依据"这种语义太窄（随时会变）。
+ * 抽早了只会多一层要维护的间接。
+ *
+ * ── 为什么必须高亮排序依据那一列 ────────────────────────────────────────
+ * 两张表长得几乎一样，唯一区别就是排序依据。不加粗的话，用户会以为
+ * "同一个榜排了两遍"，然后把两张表当成数据重复。
+ *
+ * ── 为什么三列都显示 ────────────────────────────────────────────────────
+ * 按次数榜里"用户数"和按用户榜里"次数"恰恰是最有信息量的对照：
+ * 一个高频但只伤 1 人的问题，和一个低频但伤 40 人的问题，一眼就能分辨。
+ */
+function TopTable({
+  projectId,
+  rows,
+  highlight,
+}: {
+  projectId: string
+  rows: TopIssue[]
+  highlight: 'events' | 'users'
+}) {
+  const columns: TableColumnsType<TopIssue> = [
+    {
+      title: '问题',
+      dataIndex: 'title',
+      render: (_value, row) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Link
+            to={projectPath(projectId, `/issues/${row.id}`)}
+            style={{ wordBreak: 'break-all' }}
+          >
+            {row.title}
+          </Link>
+          {row.culprit !== null && (
+            <span
+              style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', wordBreak: 'break-all' }}
+            >
+              {row.culprit}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '次数',
+      dataIndex: 'events',
+      width: 88,
+      align: 'right',
+      render: (value: number) =>
+        highlight === 'events' ? <Text strong>{formatInt(value)}</Text> : formatInt(value),
+    },
+    {
+      title: '新增用户',
+      dataIndex: 'users',
+      width: 96,
+      align: 'right',
+      render: (value: number) =>
+        highlight === 'users' ? <Text strong>{formatInt(value)}</Text> : formatInt(value),
+    },
+  ]
+
+  return (
+    <Table<TopIssue>
+      columns={columns}
+      dataSource={rows}
+      rowKey="id"
+      size="small"
+      pagination={false}
+      // 空态要说清"这段时间没有问题"，而不是留一张空白表格让人猜是不是加载失败
+      locale={{
+        emptyText: (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这段时间没有问题" />
+        ),
+      }}
+    />
+  )
 }

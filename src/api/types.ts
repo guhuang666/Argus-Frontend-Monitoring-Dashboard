@@ -353,4 +353,91 @@ export interface OverviewResult {
   }
   /** 等距补零后的趋势：没有事件的小时也会有一个 events=0 的点 */
   trend: OverviewTrendPoint[]
+  /**
+   * Top N 两个榜（FR-8.2）。
+   *
+   * 用 `?` 是因为后端可能还是旧版本（没有这个字段），此时卡片显示空态，
+   * 而不是整个概览页崩在 `undefined.byEvents` 上。
+   */
+  top?: OverviewTop
+}
+
+/** 榜单里的一行。只带列表要显示的字段，点进去才拉详情 */
+export interface TopIssue {
+  /** 问题 ID，用来拼详情页链接 */
+  id: string
+  title: string
+  /** 疑似责任位置；调用栈为空时后端返回 null */
+  culprit: string | null
+  /** fatal / error / warning / info */
+  level: string
+  /** unresolved / resolved / ignored / archived */
+  status: string
+  /** 窗口内发生次数（Σ 小时桶） */
+  events: number
+  /**
+   * 窗口内**新增**受影响用户数。
+   *
+   * 口径：只统计"首次受到影响"发生在这段时间内的用户（判据是
+   * affected_users.first_seen）。昨天首次中招、今天还在报错的用户不计入。
+   * 所以界面文案必须写「新增受影响用户」，不能写成「受影响用户」。
+   */
+  users: number
+}
+
+/** 概览页的两个排行榜：一个按吵闹程度，一个按伤人程度 */
+export interface OverviewTop {
+  /** 每榜实际返回几条（后端夹紧到 1~10 之后的值） */
+  limit: number
+  /** 按发生次数排 —— "这段时间谁最吵" */
+  byEvents: TopIssue[]
+  /** 按新增受影响用户数排 —— "这段时间谁最伤人" */
+  byUsers: TopIssue[]
+}
+
+/**
+ * 性能趋势支持的核心指标（与后端 PERF_METRICS 一一对应）。
+ *
+ * 只有 lcp / cls / inp：`performance_metrics` 表里根本没有 fcp / ttfb 两列，
+ * 传了后端会 400。所以前端的选项必须与这里严格一致，不能多加。
+ */
+export type PerfMetric = 'lcp' | 'cls' | 'inp'
+
+/**
+ * 性能趋势上的一个点（GET /api/v1/stats/performance 的 trend 元素）。
+ *
+ * ⚠️ p50 / p75 / p95 的 null 是**「这个桶里没有样本」**，不是「测得 0」。
+ * 后端 fillGaps 对缺桶刻意写 `toNullableNumber(row?.p50)` 而不是 `?? 0` ——
+ * 分位数用 0 兜底会把"没人访问"画成"性能完美"，那是这张图最不能撒的谎。
+ * 所以图表必须把 null 渲染成断点（ECharts 的 connectNulls: false）。
+ *
+ * samples 是该桶内非 null 样本数：0 表示没有样本，此时三个分位数必然全为 null。
+ * 它是"这条线为什么断在这里"的唯一解释，所以 tooltip 要带上。
+ */
+export interface PerfTrendPoint {
+  /** 桶起点，ISO 8601 UTC 字符串 */
+  t: string
+  p50: number | null
+  p75: number | null
+  p95: number | null
+  samples: number
+}
+
+/**
+ * GET /api/v1/stats/performance 的响应。
+ *
+ * bucket 与 OverviewResult 的语义完全一致（都是 stats.service 的 window() 算出来的），
+ * 所以两个页面的同一档 range 会给出同一组 x 轴 —— 用户切页面不会觉得"数据对不上"。
+ */
+export interface PerformanceTrendResult {
+  metric: PerfMetric
+  range: OverviewRange
+  /** 窗口起点（含），ISO 8601 UTC */
+  from: string
+  /** 窗口终点（不含），ISO 8601 UTC */
+  to: string
+  /** 每个点代表多长时间，前端拿它决定 x 轴标签格式 */
+  bucket: 'hour' | 'day'
+  /** 等距补空后的趋势：没有样本的桶在数组里，但三个分位数都是 null */
+  trend: PerfTrendPoint[]
 }
