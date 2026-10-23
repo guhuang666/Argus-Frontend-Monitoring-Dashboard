@@ -415,6 +415,38 @@ export interface OverviewResult {
    * 而不是整个概览页崩在 `undefined.byEvents` 上。
    */
   top?: OverviewTop
+  /**
+   * 流量指标（PV / UV / 错误率），数据来自 `sessions` 表。
+   *
+   * 同样用 `?`：后端没升级时卡片显示 "—"，而不是崩掉。
+   */
+  traffic?: OverviewTraffic
+}
+
+/**
+ * 概览页的流量指标（M5 / FR-1.23）。
+ *
+ * 与 summary 的区别：summary 回答"出了多少事"，traffic 回答
+ * "有多少人来看、其中多少比例踩了坑"。两者数据源不同
+ * （`issue_stats_hourly` vs `sessions`），所以刻意分成两个对象。
+ */
+export interface OverviewTraffic {
+  /** 页面浏览总量（Σ sessions.page_views） */
+  pv: number
+  /** 独立访客数：去重的 user_key。匿名会话（无 user_key）不计入 */
+  uv: number
+  /** 窗口内开始的会话总数 —— 错误率的**分母** */
+  sessions: number
+  /** 出过错的会话数 —— 错误率的**分子** */
+  errored_sessions: number
+  /**
+   * 错误率 = errored_sessions / sessions，取值 0~1。
+   *
+   * ⚠ null 表示**这个窗口里没有会话**，不是"0% 错误率"。
+   * 界面上必须渲染成 "—"：把"没有访问数据"显示成"0%，一切正常"
+   * 是这类看板最容易犯、也最误导人的错误。
+   */
+  error_rate: number | null
 }
 
 /** 榜单里的一行。只带列表要显示的字段，点进去才拉详情 */

@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Empty, Row, Segmented, Skeleton, Space, Statistic, Table, Typography } from 'antd'
+import { Alert, Card, Col, Empty, Row, Segmented, Skeleton, Space, Statistic, Table, Tooltip, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import { Link, useSearchParams } from 'react-router'
@@ -65,6 +65,9 @@ export default function OverviewPage() {
   const hasData = data !== undefined && data.summary.events > 0
   // 卡片的标题要跟着时间范围走，否则切到 7d 后标题还写着"近 24 小时"
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? ''
+  // 流量指标：后端可能还是旧版本（没有 traffic 字段），所以每一处都按可选处理
+  const traffic = data?.traffic
+  const errorRate = traffic?.error_rate ?? null
 
   return (
     <PageShell
@@ -108,6 +111,58 @@ export default function OverviewPage() {
             <Col xs={24} sm={8}>
               <Card>
                 <Statistic title="新问题数" value={data?.summary.new_issues ?? 0} />
+              </Card>
+            </Col>
+          </Row>
+
+          {/*
+            流量三个数字（M5 / FR-1.23）。与上一行的区别：
+            上面回答"出了多少事"，这里回答"有多少人来看、其中多少比例踩了坑"。
+            数据源不同（上一行读 issue_stats_hourly，这里读 sessions），
+            所以刻意分开放，不混成一排。
+          */}
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} sm={8}>
+              <Card>
+                <Statistic title="页面浏览（PV）" value={traffic?.pv ?? 0} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Card>
+                <Statistic
+                  title={
+                    <Tooltip title="去重后的用户数。匿名会话（SDK 拿不到身份）不计入 UV。">
+                      <span>独立访客（UV）</span>
+                    </Tooltip>
+                  }
+                  value={traffic?.uv ?? 0}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Card>
+                <Statistic
+                  title={
+                    <Tooltip
+                      title={
+                        '错误率 = 出过错的会话数 ÷ 总会话数。' +
+                        '当前口径下「总会话」只包含产生过上报的会话，因此该值偏高；' +
+                        '接入 page_view 上报后会校正。'
+                      }
+                    >
+                      <span>错误率</span>
+                    </Tooltip>
+                  }
+                  // null = 这段时间没有会话，不是 0%。渲染成 "—" 而不是 0.0%
+                  value={errorRate === null ? '—' : errorRate * 100}
+                  precision={errorRate === null ? undefined : 1}
+                  suffix={errorRate === null ? undefined : '%'}
+                />
+                {traffic !== undefined && traffic.sessions > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {`${traffic.errored_sessions} / ${traffic.sessions} 个会话`}
+                  </Text>
+                )}
               </Card>
             </Col>
           </Row>
