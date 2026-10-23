@@ -161,6 +161,53 @@ export function asBreadcrumbs(value: unknown): Breadcrumb[] {
 export type IssueStatus = 'unresolved' | 'resolved' | 'ignored' | 'archived'
 
 /**
+ * 问题级别，与后端 ISSUE_LEVELS 一一对应。
+ *
+ * ⚠ 后端 Worker 目前不推断级别，落库**全是 error** —— 这一列暂时没有区分度。
+ * 控件先做出来：等推断逻辑补上，界面不用再改。
+ */
+export type IssueLevel = 'fatal' | 'error' | 'warning' | 'info'
+
+/** 可排序字段，与后端 ISSUE_SORTS 一一对应。改这里必须同步改后端白名单 */
+export type IssueSort = 'lastSeen' | 'firstSeen' | 'timesSeen' | 'usersSeen'
+
+export type SortOrder = 'asc' | 'desc'
+
+/**
+ * 问题列表的筛选条件（FR-8.3）。
+ *
+ * 全部可选：不传 = 不筛。**注意不要塞 undefined 进去**——
+ * client.ts 的 buildUrl 会把 `undefined` 序列化成字符串 "undefined"
+ * 发给后端，然后被 class-validator 判 400（queries.ts 里用 compact 兜住）。
+ */
+export interface IssueFilters {
+  status?: IssueStatus
+  level?: IssueLevel
+  /** 关键字，同时搜 title 与 culprit */
+  q?: string
+  /** 精确匹配「最近出现在哪个版本」 */
+  release?: string
+  /** 精确匹配「最近出现在哪个环境」 */
+  environment?: string
+  /** ISO 8601，作用于 last_seen，左闭右开 */
+  from?: string
+  to?: string
+  sort?: IssueSort
+  order?: SortOrder
+}
+
+/**
+ * 筛选栏下拉数据（GET /api/v1/issues/facets）。
+ *
+ * 取值来自 `error_groups.last_release` / `last_environment` 的去重结果，
+ * 与筛选筛的是同两列 —— 否则会出现"下拉里有 web@1.0.0，选中却一个问题都没有"。
+ */
+export interface IssueFacets {
+  releases: string[]
+  environments: string[]
+}
+
+/**
  * 一个「问题」—— worker 按指纹归并后的实体（GET /api/v1/issues 的 items 元素）。
  *
  * 与 ErrorEventRow 的三点关键差异：
@@ -197,6 +244,14 @@ export interface IssueRow extends Record<string, unknown> {
   last_seen: string
   first_release: string | null
   last_release: string | null
+  /**
+   * 最近一次出现在哪个环境（production / staging / local…）。
+   *
+   * 可空：SDK 没配 environment 的历史问题就是 NULL。按环境筛选时它们
+   * 不会命中任何环境 —— 这是正确行为（确实不知道它属于哪个环境），
+   * 不是数据丢失。
+   */
+  last_environment: string | null
   /** NULL 表示尚未解决；后端只在进入 resolved 时打点 */
   resolved_at: string | null
   /**

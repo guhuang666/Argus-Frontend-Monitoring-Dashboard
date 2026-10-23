@@ -4,8 +4,9 @@ import { request } from './client'
 import type {
   ErrorEventRow,
   IssueDetail,
+  IssueFacets,
+  IssueFilters,
   IssueRow,
-  IssueStatus,
   OverviewRange,
   OverviewResult,
   PageResult,
@@ -102,31 +103,69 @@ export function usePerformanceMetrics(projectId: string, page: number, pageSize:
 }
 
 /**
- * 问题列表分页查询（GET /api/v1/issues）。
+ * 问题列表分页查询（GET /api/v1/issues），支持六维筛选 + 排序（FR-8.3）。
  *
- * status 不传 = 不过滤（后端 ListIssuesQueryDto 的立场：默认不筛，
+ * 不传任何筛选 = 不过滤（后端 ListIssuesQueryDto 的立场：默认不筛，
  * 避免"归并越成功、看板越空"）。
  *
- * ⚠ queryKey 里用 `status ?? 'all'` 而不是直接放 status：
- * 放 undefined 会让 ['issues',1,20,undefined] 与不带第四项的 key 指向
- * 两个不同缓存，切换"全部"时会白跑一次请求。
+ * ⚠ queryKey 里放整个 filters 对象，而不是逐项摊开：
+ * TanStack 对 key 做的是**稳定序列化**（对象键排序后哈希），
+ * 所以 `{status, level}` 与 `{level, status}` 指向同一个缓存 —— 这是安全的。
+ * 但 undefined 与缺失必须归一：`status: undefined` 和"没有 status 这个键"
+ * 在哈希上是两个 key，会造成"切回全部时白跑一次请求"。所以调用方
+ * 传进来之前要清掉空值（见 IssuesPage 的 readFilters）。
  *
- * ⚠ status 只是**过滤条件**，不进请求体。后端也只支持这一个过滤维度
- * （没有关键词、没有 level、没有时间范围），所以界面上不要多加控件。
+ * ⚠ 参数里不能带 undefined：client.ts 的 buildUrl 对每个 entry 都做
+ * `String(value)`，于是 `status=undefined` 会被真的发出去，
+ * 后端 class-validator 直接 400。所以这里统一过一遍 compact()。
  */
-export function useIssues(projectId: string, page: number, pageSize: number, status?: IssueStatus) {
+export function useIssues(
+  projectId: string,
+  page: number,
+  pageSize: number,
+  filters: IssueFilters = {},
+) {
   return useQuery({
-    queryKey: ['issues', projectId, page, pageSize, status ?? 'all'],
+    queryKey: ['issues', projectId, page, pageSize, filters],
     queryFn: () =>
-      request<PageResult<IssueRow>>('/v1/issues', {
-        projectId,
-        page,
-        pageSize,
-        ...(status ? { status } : {}),
-      }),
+      request<PageResult<IssueRow>>(
+        '/v1/issues',
+        compact({ projectId, page, pageSize, ...filters }),
+      ),
     placeholderData: keepPreviousData,
     enabled: projectId !== '',
   })
+}
+
+/**
+ * 筛选栏的下拉数据（GET /api/v1/issues/facets）。
+ *
+ * 单独一个请求、单独的 key：版本与环境列表比问题列表变得慢得多，
+ * 没必要每次翻页都跟着重新拉一遍。`staleTime` 给 5 分钟是有意的 ——
+ * 新发版后最多 5 分钟就能在下拉里看到新版本。
+ */
+export function useIssueFacets(projectId: string) {
+  return useQuery({
+    queryKey: ['issue-facets', projectId],
+    queryFn: () => request<IssueFacets>('/v1/issues/facets', { projectId }),
+    staleTime: 5 * 60 * 1000,
+    enabled: projectId !== '',
+  })
+}
+
+/**
+ * 去掉 undefined / null / 空串。
+ *
+ * 存在理由见 useIssues 的第二条注释：`String(undefined)` 会变成字符串
+ * "undefined" 发出去。这个函数是"参数可选"与"序列化不留空"之间唯一的桥。
+ */
+function compact(values: Record<string, unknown>): Record<string, string | number> {
+  const result: Record<string, string | number> = {}
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined || value === null || value === '') continue
+    result[key] = value as string | number
+  }
+  return result
 }
 
 /**
