@@ -21,6 +21,8 @@ const NAV_ITEMS = [
   { key: '/errors', label: '异常' },
   { key: '/issues', label: '问题' },
   { key: '/performance', label: '性能' },
+  // 设置放最后：它是"配置"，不是日常查看的对象
+  { key: '/settings', label: '设置' },
 ]
 
 /**

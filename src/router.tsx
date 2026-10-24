@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import OverviewPage from './pages/OverviewPage'
 import PerformancePage from './pages/PerformancePage'
 import ProjectsPage from './pages/ProjectsPage'
+import SettingsPage from './pages/SettingsPage'
 
 /**
  * 路由表。用 createBrowserRouter（数据路由）而不是 BrowserRouter + Routes：
@@ -58,6 +59,8 @@ export const router = createBrowserRouter([
               { path: 'issues', element: <IssuesPage /> },
               { path: 'issues/:id', element: <IssueDetailPage /> },
               { path: 'performance', element: <PerformancePage /> },
+              // 项目设置（M6-2）：目前只有告警规则一节，后面接采样率/配额/密钥
+              { path: 'settings', element: <SettingsPage /> },
               // 项目内的未知子路径：回到这个项目的概览，而不是把用户扔到别的项目
               { path: '*', element: <Navigate to="overview" replace /> },
             ],

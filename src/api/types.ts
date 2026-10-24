@@ -528,3 +528,106 @@ export interface PerformanceTrendResult {
   /** 等距补空后的趋势：没有样本的桶在数组里，但三个分位数都是 null */
   trend: PerfTrendPoint[]
 }
+
+/* ───────────────────────── 告警规则（M6-2）───────────────────────── */
+
+/**
+ * 被监控的指标，与后端 ALERT_METRICS 一一对应。
+ *
+ * 少一个后端就收不到、多一个后端会 400 —— 两边必须逐字一致。
+ */
+export type AlertMetric = 'events' | 'users' | 'new_issues' | 'error_rate' | 'lcp_p75'
+
+/** 比较方向：gt = 高于阈值触发，lt = 低于阈值触发 */
+export type AlertComparator = 'gt' | 'lt'
+
+/** 投递渠道，与后端 ALERT_CHANNELS 一一对应 */
+export type AlertChannel = 'feishu' | 'slack' | 'dingtalk'
+
+/**
+ * 一条告警规则（GET /api/v1/alert-rules 的 items 元素）。
+ *
+ * ⚠️ **没有完整的 webhook 地址**，只有 `webhook_url_masked`（末 6 位）。
+ * 后端刻意不回明文：它等于一张能往群里发消息的凭证。
+ * 所以编辑时"地址留空"不是没填，而是"保持不变"。
+ */
+export interface AlertRuleRow {
+  id: string
+  name: string
+  metric: AlertMetric
+  comparator: AlertComparator
+  threshold: number
+  window_minutes: number
+  environment: string | null
+  release: string | null
+  channel: AlertChannel
+  /** 形如 `***6c5b4a`，用来让人确认"是不是这条"，不足以拿去调用 */
+  webhook_url_masked: string
+  /** 是否配过地址。`***` 本身分不出"配过"和"空"，所以要这个布尔 */
+  webhook_url_set: boolean
+  silence_minutes: number
+  enabled: boolean
+  /** 上次触发时刻；null = 从未触发（M6-3 之前恒为 null） */
+  last_fired_at: string | null
+  created_at: string
+}
+
+/** GET /api/v1/alert-rules 的响应（不分页：一个项目的规则是十几个量级） */
+export interface AlertRuleListResult {
+  items: AlertRuleRow[]
+}
+
+/**
+ * 新建/修改的请求体。
+ *
+ * 字段名与后端 DTO 一样是 snake_case —— 请求和响应共用一套命名，
+ * 省掉一层映射，也省掉"改字段名时只改了一半"的机会。
+ */
+export interface AlertRulePayload {
+  name: string
+  metric: AlertMetric
+  comparator: AlertComparator
+  threshold: number
+  window_minutes: number
+  channel: AlertChannel
+  /** 编辑时留空 = 不传 = 保持原地址 */
+  webhook_url?: string
+  silence_minutes: number
+  enabled: boolean
+}
+
+/* ───────────────────────── 告警历史（M6-5）───────────────────────── */
+
+/**
+ * 一条触发记录（GET /api/v1/alert-events 的 items 元素）。
+ *
+ * ⚠️ `metric / threshold / window_minutes` 是**触发当时的快照**，不是规则当前配置。
+ * 规则改过阈值之后，靠它们才能解释"当时为什么算越线"。
+ * 三个都可能为 null（本列上线前写的老数据），界面上要渲染成 "—"。
+ */
+export interface AlertEventRow {
+  id: string
+  rule_id: string
+  /** 规则名（后端 join 出来的，删规则时历史也会一起删，所以一定有值） */
+  rule_name: string
+  channel: AlertChannel
+  /** 触发时刻，ISO 8601 UTC */
+  fired_at: string
+  /** 触发时算出来的实际值 */
+  value: number
+  metric: AlertMetric | null
+  threshold: number | null
+  window_minutes: number | null
+  /** 是否成功送达 webhook */
+  delivered: boolean
+  /** 失败原因（HTTP 状态码 / 超时 / errcode），成功时为 null */
+  error: string | null
+}
+
+/** GET /api/v1/alert-events 的响应（服务端分页） */
+export interface AlertEventListResult {
+  items: AlertEventRow[]
+  total: number
+  page: number
+  pageSize: number
+}

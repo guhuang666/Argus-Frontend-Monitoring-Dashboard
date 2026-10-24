@@ -1,7 +1,11 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchMe } from './auth'
-import { request } from './client'
+import { deleteRequest, patchJson, postJson, request } from './client'
 import type {
+  AlertEventListResult,
+  AlertRuleListResult,
+  AlertRulePayload,
+  AlertRuleRow,
   ErrorEventRow,
   IssueDetail,
   IssueFacets,
@@ -234,6 +238,115 @@ export function usePerformanceTrend(
     queryKey: ['performance-trend', projectId, range, metric],
     queryFn: () =>
       request<PerformanceTrendResult>('/v1/stats/performance', { projectId, metric, range }),
+    placeholderData: keepPreviousData,
+    enabled: projectId !== '',
+  })
+}
+
+/* ───────────────────────── 告警规则（M6-2）───────────────────────── */
+
+/** 规则的 queryKey 工厂：失效、预取都只写一处，避免字符串拼错导致缓存不刷新 */
+const alertRulesKey = (projectId: string) => ['alert-rules', projectId] as const
+
+/**
+ * 规则列表（GET /api/v1/alert-rules）。
+ *
+ * 规则是"配置"，变化只可能来自用户自己的操作，所以不做轮询、
+ * staleTime 给足 30 秒；真正的时效性在评估器那边（M6-3），不在这个列表上。
+ */
+export function useAlertRules(projectId: string) {
+  return useQuery({
+    queryKey: alertRulesKey(projectId),
+    queryFn: () => request<AlertRuleListResult>('/v1/alert-rules', { projectId }),
+    staleTime: 30_000,
+    enabled: projectId !== '',
+  })
+}
+
+/**
+ * 三个写操作放在一起，是因为它们共享同一套"成功之后要做什么"：
+ * 让规则列表失效，重新拉一次。手写 `queryClient.invalidateQueries` 三次
+ * 是最容易漏掉一处的地方 —— 漏掉的那一处表现为"保存成功，但列表没变"。
+ *
+ * 注意 projectId 拼进了 path 而不是 params：POST/PATCH/DELETE 的 send()
+ * 不接受 params（只有 GET 需要），拼在 URL 上最直接。
+ */
+export function useCreateAlertRule(projectId: string) {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: (payload: AlertRulePayload) =>
+      postJson<AlertRuleRow>(`/v1/alert-rules?projectId=${encodeURIComponent(projectId)}`, payload),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: alertRulesKey(projectId) })
+    },
+  })
+}
+
+export function useUpdateAlertRule(projectId: string) {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: { id: string; patch: Partial<AlertRulePayload> }) =>
+      patchJson<AlertRuleRow>(
+        `/v1/alert-rules/${encodeURIComponent(input.id)}?projectId=${encodeURIComponent(projectId)}`,
+        input.patch,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: alertRulesKey(projectId) })
+    },
+  })
+}
+
+export function useDeleteAlertRule(projectId: string) {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      deleteRequest(
+        `/v1/alert-rules/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: alertRulesKey(projectId) })
+    },
+  })
+}
+
+/**
+ * 触发历史（GET /api/v1/alert-events）。
+ *
+ * 四个筛选条件全部进 queryKey —— 漏一个的表现是"筛了但列表没变"，
+ * 属于最难靠肉眼发现的一类（和 projectId 漏进 key 同级）。
+ *
+ * `delivered` 要转成字符串再发：request 的 QueryParams 只接受 string | number，
+ * 而前端传过来的是布尔。后端用 @Transform 把它转回真正的布尔。
+ */
+export function useAlertEvents(
+  projectId: string,
+  params: {
+    page: number
+    pageSize: number
+    ruleId?: string
+    delivered?: boolean
+  },
+) {
+  return useQuery({
+    queryKey: [
+      'alert-events',
+      projectId,
+      params.page,
+      params.pageSize,
+      params.ruleId ?? 'all',
+      params.delivered === undefined ? 'all' : String(params.delivered),
+    ],
+    queryFn: () =>
+      request<AlertEventListResult>('/v1/alert-events', {
+        projectId,
+        page: params.page,
+        pageSize: params.pageSize,
+        ...(params.ruleId === undefined ? {} : { ruleId: params.ruleId }),
+        ...(params.delivered === undefined ? {} : { delivered: String(params.delivered) }),
+      }),
     placeholderData: keepPreviousData,
     enabled: projectId !== '',
   })

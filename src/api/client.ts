@@ -116,6 +116,27 @@ export function postJson<T>(path: string, body?: unknown): Promise<T> {
 }
 
 /**
+ * 需要登录的 PATCH（局部更新）。
+ *
+ * 和 POST 共用一个 `send`，401 处理、错误文案、204 空响应都自动一致 ——
+ * 这也正是把它们收在一个文件里的原因：三个方法各写一份 fetch，
+ * 迟早会出现"GET 会跳登录页、PATCH 不会"这种不一致。
+ */
+export function patchJson<T>(path: string, body?: unknown): Promise<T> {
+  return send<T>('PATCH', path, { body, auth: true })
+}
+
+/**
+ * 需要登录的 DELETE。
+ *
+ * 后端返回 204（没有响应体），`send` 里已经对 204 做了短路，返回 undefined。
+ * 所以这里的泛型默认 `void`：调用方本来也不该期待一个返回值。
+ */
+export function deleteRequest<T = void>(path: string): Promise<T> {
+  return send<T>('DELETE', path, { auth: true })
+}
+
+/**
  * 不需要登录的 POST —— 只有登录和注册用。
  *
  * 单独一个函数而不是传个 `auth: false` 参数：让"哪些接口是公开的"
