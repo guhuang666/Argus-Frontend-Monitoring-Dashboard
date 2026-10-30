@@ -1,0 +1,12 @@
+# 构建上下文排除清单。
+# Docker 不读 .gitignore，必须单独写这一份。
+
+# 本机的 node_modules 是 Windows 版，进镜像会覆盖掉 npm ci 装好的 Linux 版
+node_modules
+
+# 构建产物，镜像里会重新 build
+dist
+
+.vscode
+*.log
+.git
