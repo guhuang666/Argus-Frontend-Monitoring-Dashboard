@@ -17,7 +17,7 @@ npm run dev        # http://localhost:5173，/api 自动代理到后端
 后端默认在 `http://localhost:3000`，要指到别的机器就设环境变量：
 
 ```bash
-VITE_PROXY_TARGET=http://ghargus.cn:8080 npm run dev
+VITE_PROXY_TARGET=http://47.119.32.85 npm run dev
 ```
 
 | 命令 | 作用 |
